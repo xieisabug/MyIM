@@ -6,10 +6,12 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
+import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.Toast;
 
 import com.easemob.chat.EMContactManager;
+import com.easemob.chat.EMGroupManager;
 import com.easemob.exceptions.EaseMobException;
 
 import butterknife.ButterKnife;
@@ -22,6 +24,8 @@ public class AddContactActivity extends ActionBarActivity implements View.OnClic
     EditText mKeyword;
     @InjectView(R.id.add)
     Button mAdd;
+    @InjectView(R.id.isGroup)
+    CheckBox mIsGroup;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -59,13 +63,24 @@ public class AddContactActivity extends ActionBarActivity implements View.OnClic
     public void onClick(View view) {
         switch (view.getId()) {
             case R.id.add:
-                try {
-                    EMContactManager.getInstance().addContact(mKeyword.getText().toString(), "加我加我～");
-                    Toast.makeText(AddContactActivity.this, "添加成功，请等待对方同意", Toast.LENGTH_SHORT).show();
-                    this.finish();
-                } catch (EaseMobException e) {
-                    e.printStackTrace();
+                if (mIsGroup.isChecked()) {
+                    try {
+                        EMGroupManager.getInstance().applyJoinToGroup(mKeyword.getText().toString(),"我要进群～");
+                        Toast.makeText(AddContactActivity.this, "申请进群成功，请等待群主同意", Toast.LENGTH_SHORT).show();
+                        this.finish();
+                    } catch (EaseMobException e) {
+                        e.printStackTrace();
+                    }
+                } else {
+                    try {
+                        EMContactManager.getInstance().addContact(mKeyword.getText().toString(), "加我加我～");
+                        Toast.makeText(AddContactActivity.this, "添加成功，请等待对方同意", Toast.LENGTH_SHORT).show();
+                        this.finish();
+                    } catch (EaseMobException e) {
+                        e.printStackTrace();
+                    }
                 }
+
                 break;
         }
     }
