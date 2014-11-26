@@ -1,7 +1,11 @@
 package com.im.oxygen.myim;
 
+import android.app.AlertDialog;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Message;
 import android.support.v7.app.ActionBarActivity;
 import android.util.Log;
 import android.view.Menu;
@@ -38,6 +42,39 @@ public class MainActivity extends ActionBarActivity implements AdapterView.OnIte
 
     List<String> usernames;
     private ContactAdapter contactAdapter;
+    String s,s2;
+
+    Handler mHandler = new Handler(){
+        @Override
+        public void handleMessage(Message msg) {
+            super.handleMessage(msg);
+            final AlertDialog.Builder builder = new AlertDialog.Builder(MainActivity.this);
+            builder.setMessage(s + "邀请你加他为好友，原因：" + s2)
+                    .setCancelable(false)
+                    .setPositiveButton("同意", new DialogInterface.OnClickListener() {
+                        public void onClick(DialogInterface dialog, int id) {
+                            try {
+                                EMChatManager.getInstance().acceptInvitation(s);
+                                dialog.dismiss();
+                            } catch (EaseMobException e) {
+                                e.printStackTrace();
+                            }
+                        }
+                    })
+                    .setNegativeButton("不同意", new DialogInterface.OnClickListener() {
+                        public void onClick(DialogInterface dialog, int id) {
+                            try {
+                                EMChatManager.getInstance().refuseInvitation(s);
+                                dialog.dismiss();
+                            } catch (EaseMobException e) {
+                                e.printStackTrace();
+                            }
+                        }
+                    });
+            AlertDialog alert = builder.create();
+            alert.show();
+        }
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -126,10 +163,14 @@ public class MainActivity extends ActionBarActivity implements AdapterView.OnIte
         }
 
         @Override
-        public void onContactInvited(String s, String s2) {
+        public void onContactInvited(final String s, final String s2) {
             Log.d(TAG, "invited");
             Log.d(TAG, "S:"+s + " ; s2:" + s2);
             EMNotifier.getInstance(getApplicationContext()).notifyOnNewMsg();
+            MainActivity.this.s = s;
+            MainActivity.this.s2 = s2;
+            mHandler.sendEmptyMessage(0);
+
         }
 
         @Override
