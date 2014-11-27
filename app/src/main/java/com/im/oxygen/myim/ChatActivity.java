@@ -5,6 +5,8 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Message;
 import android.support.v7.app.ActionBarActivity;
 import android.text.TextUtils;
 import android.util.Log;
@@ -27,6 +29,7 @@ import butterknife.InjectView;
 
 public class ChatActivity extends ActionBarActivity implements View.OnClickListener{
 
+    private static final int MESSAGE_REFRESH = 1;
     @InjectView(R.id.text)
     EditText mText;
     @InjectView(R.id.send)
@@ -35,8 +38,21 @@ public class ChatActivity extends ActionBarActivity implements View.OnClickListe
     ListView mChatList;
 
     MessageAdapter mMessageAdapter;
+    NewMessageBroadcastReceiver msgReceiver;
 
     String username;
+
+    Handler mMessageHandler = new Handler() {
+        @Override
+        public void handleMessage(Message msg) {
+            super.handleMessage(msg);
+            switch (msg.what) {
+                case MESSAGE_REFRESH:
+                    mMessageAdapter.refresh();
+                    break;
+            }
+        }
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -44,7 +60,7 @@ public class ChatActivity extends ActionBarActivity implements View.OnClickListe
         setContentView(R.layout.activity_chat);
         ButterKnife.inject(this);
 
-        NewMessageBroadcastReceiver msgReceiver = new NewMessageBroadcastReceiver();
+        msgReceiver = new NewMessageBroadcastReceiver();
         IntentFilter intentFilter = new IntentFilter(EMChatManager.getInstance().getNewMessageBroadcastAction());
         intentFilter.setPriority(3);
         registerReceiver(msgReceiver, intentFilter);
@@ -94,12 +110,19 @@ public class ChatActivity extends ActionBarActivity implements View.OnClickListe
                     try {
                         EMChatManager.getInstance().sendMessage(message);
                         mText.setText("");
+                        mMessageHandler.sendEmptyMessage(MESSAGE_REFRESH);
                     } catch (EaseMobException e) {
                         e.printStackTrace();
                     }
                 }
                 break;
         }
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        unregisterReceiver(msgReceiver);
     }
 
     private class NewMessageBroadcastReceiver extends BroadcastReceiver {
@@ -116,8 +139,7 @@ public class ChatActivity extends ActionBarActivity implements View.OnClickListe
             //更方便的方法是通过msgId直接获取整个message
             EMMessage message = EMChatManager.getInstance().getMessage(msgId);
             Log.d("ChatActivity", "message content:" + ((TextMessageBody) message.getBody()).getMessage());
-
-            mMessageAdapter.notifyDataSetChanged();
+            mMessageHandler.sendEmptyMessage(MESSAGE_REFRESH);
         }
     }
 }

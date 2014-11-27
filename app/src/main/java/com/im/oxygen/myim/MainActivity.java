@@ -24,6 +24,7 @@ import com.easemob.chat.EMContactListener;
 import com.easemob.chat.EMContactManager;
 import com.easemob.chat.EMGroupManager;
 import com.easemob.chat.EMNotifier;
+import com.easemob.exceptions.EMNetworkUnconnectedException;
 import com.easemob.exceptions.EaseMobException;
 
 import java.util.List;
@@ -107,7 +108,12 @@ public class MainActivity extends ActionBarActivity implements AdapterView.OnIte
     }
 
     private void getContactList() throws EaseMobException {
-        usernames = EMContactManager.getInstance().getContactUserNames();
+        try {
+            usernames = EMContactManager.getInstance().getContactUserNames();
+        } catch (EMNetworkUnconnectedException exception) {
+            exception.printStackTrace();
+            getContactList();
+        }
     }
 
 
@@ -121,8 +127,10 @@ public class MainActivity extends ActionBarActivity implements AdapterView.OnIte
     public boolean onOptionsItemSelected(MenuItem item) {
         int id = item.getItemId();
 
-        if (id == R.id.action_settings) {
-            return true;
+        switch (id) {
+            case R.id.create_group:
+
+                break;
         }
 
         return super.onOptionsItemSelected(item);

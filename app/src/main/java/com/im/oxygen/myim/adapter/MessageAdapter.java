@@ -36,6 +36,11 @@ public class MessageAdapter extends BaseAdapter {
 
     }
 
+    public void refresh(){
+        this.emConversation = EMChatManager.getInstance().getConversation(mUsername);
+        this.notifyDataSetChanged();
+    }
+
     @Override
     public int getCount() {
         return emConversation.getMsgCount();
