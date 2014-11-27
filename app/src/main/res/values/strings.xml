@@ -8,5 +8,6 @@
     <string name="title_activity_chat">ChatActivity</string>
     <string name="title_activity_add_contact">添加用户</string>
     <string name="title_activity_create_group">新建群组</string>
+    <string name="title_activity_group_chat">GroupChatActivity</string>
 
 </resources>

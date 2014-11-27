@@ -57,6 +57,10 @@
             android:name="com.im.oxygen.myim.CreateGroupActivity"
             android:label="@string/title_activity_create_group" >
         </activity>
+        <activity
+            android:name="com.im.oxygen.myim.GroupChatActivity"
+            android:label="@string/title_activity_group_chat" >
+        </activity>
     </application>
 
 </manifest>
