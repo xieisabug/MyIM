@@ -16,15 +16,17 @@ import android.widget.AdapterView;
 import android.widget.BaseAdapter;
 import android.widget.Button;
 import android.widget.ListView;
+import android.widget.RadioButton;
+import android.widget.RadioGroup;
 import android.widget.TextView;
 
 import com.easemob.chat.EMChat;
 import com.easemob.chat.EMChatManager;
 import com.easemob.chat.EMContactListener;
 import com.easemob.chat.EMContactManager;
+import com.easemob.chat.EMGroup;
 import com.easemob.chat.EMGroupManager;
 import com.easemob.chat.EMNotifier;
-import com.easemob.exceptions.EMNetworkUnconnectedException;
 import com.easemob.exceptions.EaseMobException;
 
 import java.util.List;
@@ -32,7 +34,7 @@ import java.util.List;
 import butterknife.ButterKnife;
 import butterknife.InjectView;
 
-public class MainActivity extends ActionBarActivity implements AdapterView.OnItemClickListener, View.OnClickListener {
+public class MainActivity extends ActionBarActivity implements AdapterView.OnItemClickListener, View.OnClickListener, RadioGroup.OnCheckedChangeListener {
 
     String TAG = "MainActivity";
 
@@ -40,12 +42,22 @@ public class MainActivity extends ActionBarActivity implements AdapterView.OnIte
     ListView mContactList;
     @InjectView(R.id.add)
     Button mAdd;
+    @InjectView(R.id.people)
+    RadioButton mPeople;
+    @InjectView(R.id.group)
+    RadioButton mGroup;
+    @InjectView(R.id.tab_container)
+    RadioGroup mTabContainer;
 
     List<String> usernames;
-    private ContactAdapter contactAdapter;
-    String s,s2;
+    List<EMGroup> emGroups;
 
-    Handler mHandler = new Handler(){
+    private ContactAdapter contactAdapter;
+    GroupAdapter groupAdapter;
+
+    String s, s2;
+
+    Handler mHandler = new Handler() {
         @Override
         public void handleMessage(Message msg) {
             super.handleMessage(msg);
@@ -88,32 +100,37 @@ public class MainActivity extends ActionBarActivity implements AdapterView.OnIte
         // conversations in case we are auto login
         EMGroupManager.getInstance().loadAllGroups();
         EMChatManager.getInstance().loadAllConversations();
+
+        EMContactManager.getInstance().setContactListener(new MyContactListener());
+
+        mAdd.setOnClickListener(this);
+        EMChat.getInstance().setAppInited();
+
         // demo中简单的处理成每次登陆都去获取好友username，开发者自己根据情况而定
         try {
             getContactList();
+            getGroupList();
             for (String username : usernames) {
                 Log.d("MainActivity", username);
             }
             contactAdapter = new ContactAdapter(usernames);
+            groupAdapter = new GroupAdapter(emGroups);
             mContactList.setAdapter(contactAdapter);
             mContactList.setOnItemClickListener(this);
         } catch (EaseMobException e) {
             e.printStackTrace();
         }
 
-        EMContactManager.getInstance().setContactListener(new MyContactListener());
+        mTabContainer.setOnCheckedChangeListener(this);
 
-        mAdd.setOnClickListener(this);
-        EMChat.getInstance().setAppInited();
     }
 
     private void getContactList() throws EaseMobException {
-        try {
-            usernames = EMContactManager.getInstance().getContactUserNames();
-        } catch (EMNetworkUnconnectedException exception) {
-            exception.printStackTrace();
-            getContactList();
-        }
+        usernames = EMContactManager.getInstance().getContactUserNames();
+    }
+
+    private void getGroupList() throws EaseMobException {
+        emGroups = EMGroupManager.getInstance().getGroupsFromServer();
     }
 
 
@@ -129,7 +146,8 @@ public class MainActivity extends ActionBarActivity implements AdapterView.OnIte
 
         switch (id) {
             case R.id.create_group:
-
+                Intent intent = new Intent(MainActivity.this, CreateGroupActivity.class);
+                startActivity(intent);
                 break;
         }
 
@@ -149,6 +167,20 @@ public class MainActivity extends ActionBarActivity implements AdapterView.OnIte
             case R.id.add:
                 Intent intent = new Intent(MainActivity.this, AddContactActivity.class);
                 startActivity(intent);
+                break;
+        }
+    }
+
+    @Override
+    public void onCheckedChanged(RadioGroup group, int checkedId) {
+        switch (checkedId) {
+            case R.id.group:
+                Log.d(TAG, "group click");
+                mContactList.setAdapter(groupAdapter);
+                break;
+            case R.id.people:
+                Log.d(TAG, "people click");
+                mContactList.setAdapter(contactAdapter);
                 break;
         }
     }
@@ -173,7 +205,7 @@ public class MainActivity extends ActionBarActivity implements AdapterView.OnIte
         @Override
         public void onContactInvited(final String s, final String s2) {
             Log.d(TAG, "invited");
-            Log.d(TAG, "S:"+s + " ; s2:" + s2);
+            Log.d(TAG, "S:" + s + " ; s2:" + s2);
             EMNotifier.getInstance(getApplicationContext()).notifyOnNewMsg();
             MainActivity.this.s = s;
             MainActivity.this.s2 = s2;
@@ -233,6 +265,55 @@ public class MainActivity extends ActionBarActivity implements AdapterView.OnIte
             }
 
             viewHolder.mUsername.setText(this.contactList.get(i));
+
+            return view;
+        }
+
+        class ViewHolder {
+            @InjectView(R.id.username)
+            TextView mUsername;
+
+            ViewHolder(View view) {
+                ButterKnife.inject(this, view);
+            }
+        }
+    }
+
+    class GroupAdapter extends BaseAdapter {
+
+        private List<EMGroup> mList;
+
+        public GroupAdapter(List<EMGroup> list) {
+            mList = list;
+        }
+
+        @Override
+        public int getCount() {
+            return mList.size();
+        }
+
+        @Override
+        public Object getItem(int position) {
+            return mList.get(position);
+        }
+
+        @Override
+        public long getItemId(int position) {
+            return position;
+        }
+
+        @Override
+        public View getView(int position, View view, ViewGroup parent) {
+            ViewHolder viewHolder;
+            if (view == null) {
+                view = View.inflate(MainActivity.this, R.layout.row_contact, null);
+                viewHolder = new ViewHolder(view);
+                view.setTag(viewHolder);
+            } else {
+                viewHolder = (ViewHolder) view.getTag();
+            }
+
+            viewHolder.mUsername.setText(this.mList.get(position).getGroupName());
 
             return view;
         }
