@@ -53,6 +53,10 @@
             android:name="com.im.oxygen.myim.AddContactActivity"
             android:label="@string/title_activity_add_contact" >
         </activity>
+        <activity
+            android:name="com.im.oxygen.myim.CreateGroupActivity"
+            android:label="@string/title_activity_create_group" >
+        </activity>
     </application>
 
 </manifest>
