@@ -6,6 +6,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.os.Bundle;
 import android.support.v7.app.ActionBarActivity;
+import android.text.TextUtils;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -48,6 +49,7 @@ public class ChatActivity extends ActionBarActivity implements View.OnClickListe
         intentFilter.setPriority(3);
         registerReceiver(msgReceiver, intentFilter);
         username = getIntent().getStringExtra("username");
+        getSupportActionBar().setTitle(username);
 
         mMessageAdapter = new MessageAdapter(this, username);
 
@@ -84,14 +86,17 @@ public class ChatActivity extends ActionBarActivity implements View.OnClickListe
         switch (view.getId()) {
             case R.id.send:
                 String text = mText.getText().toString();
-                EMMessage message = EMMessage.createSendMessage(EMMessage.Type.TXT);
-                message.setReceipt(username);
-                TextMessageBody textMessageBody = new TextMessageBody(text);
-                message.addBody(textMessageBody);
-                try {
-                    EMChatManager.getInstance().sendMessage(message);
-                } catch (EaseMobException e) {
-                    e.printStackTrace();
+                if (!TextUtils.isEmpty(text)) {
+                    EMMessage message = EMMessage.createSendMessage(EMMessage.Type.TXT);
+                    message.setReceipt(username);
+                    TextMessageBody textMessageBody = new TextMessageBody(text);
+                    message.addBody(textMessageBody);
+                    try {
+                        EMChatManager.getInstance().sendMessage(message);
+                        mText.setText("");
+                    } catch (EaseMobException e) {
+                        e.printStackTrace();
+                    }
                 }
                 break;
         }
