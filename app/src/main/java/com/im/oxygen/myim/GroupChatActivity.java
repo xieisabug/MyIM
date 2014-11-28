@@ -1,19 +1,52 @@
 package com.im.oxygen.myim;
 
-import android.support.v7.app.ActionBarActivity;
 import android.os.Bundle;
+import android.support.v7.app.ActionBarActivity;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.View;
+import android.widget.Button;
+import android.widget.EditText;
+import android.widget.LinearLayout;
+import android.widget.ListView;
+
+import com.easemob.chat.EMMessage;
+import com.easemob.chat.TextMessageBody;
+
+import butterknife.ButterKnife;
+import butterknife.InjectView;
+import butterknife.OnClick;
 
 
 public class GroupChatActivity extends ActionBarActivity {
+
+    @InjectView(R.id.expand)
+    Button mExpand;
+    @InjectView(R.id.text)
+    EditText mText;
+    @InjectView(R.id.send)
+    Button mSend;
+    @InjectView(R.id.input_container)
+    LinearLayout mInputContainer;
+    @InjectView(R.id.chat_list)
+    ListView mChatList;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_group_chat);
+        ButterKnife.inject(this);
     }
 
+    @OnClick(R.id.send)
+    void send(View view) {
+        String text = mText.getText().toString();
+        EMMessage emMessage = EMMessage.createSendMessage(EMMessage.Type.TXT);
+        emMessage.setChatType(EMMessage.ChatType.GroupChat);
+        emMessage.setReceipt("");
+        TextMessageBody textMessageBody = new TextMessageBody(text);
+        emMessage.addBody(textMessageBody);
+    }
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
