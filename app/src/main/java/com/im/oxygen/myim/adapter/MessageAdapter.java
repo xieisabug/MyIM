@@ -2,6 +2,8 @@ package com.im.oxygen.myim.adapter;
 
 import android.app.Activity;
 import android.content.Context;
+import android.media.AudioManager;
+import android.media.MediaPlayer;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -13,7 +15,11 @@ import com.easemob.chat.EMChatManager;
 import com.easemob.chat.EMConversation;
 import com.easemob.chat.EMMessage;
 import com.easemob.chat.TextMessageBody;
+import com.easemob.chat.VoiceMessageBody;
+import com.im.oxygen.myim.ChatActivity;
 import com.im.oxygen.myim.R;
+
+import java.io.File;
 
 import butterknife.ButterKnife;
 import butterknife.InjectView;
@@ -24,6 +30,8 @@ public class MessageAdapter extends BaseAdapter {
     private String mUsername;
     private Activity mActivity;
     private LayoutInflater inflater;
+    MediaPlayer mediaPlayer;
+
 
     private EMConversation emConversation;
 
@@ -75,11 +83,8 @@ public class MessageAdapter extends BaseAdapter {
 
     @Override
     public View getView(int i, View view, ViewGroup viewGroup) {
-        EMMessage message = emConversation.getMessage(i);
-        String messageText = ((TextMessageBody) message.getBody()).getMessage();
+        final EMMessage message = emConversation.getMessage(i);
         ViewHolder viewHolder;
-        Log.d("message adapter",messageText + " from " + message.getFrom() +
-                " : " + message.direct.name());
         if (view == null) {
             if (message.direct == EMMessage.Direct.RECEIVE) {
                 view = inflater.inflate(R.layout.receive_message, null);
@@ -91,9 +96,59 @@ public class MessageAdapter extends BaseAdapter {
         } else {
             viewHolder = (ViewHolder) view.getTag();
         }
+        if (message.getType() == EMMessage.Type.TXT) {
+            String messageText = ((TextMessageBody) message.getBody()).getMessage();
+            Log.d("message adapter",messageText + " from " + message.getFrom() +
+                    " : " + message.direct.name());
 
-        viewHolder.mMessage.setText(messageText);
-        viewHolder.mUsername.setText(message.getFrom());
+            viewHolder.mMessage.setText(messageText);
+            viewHolder.mUsername.setText(message.getFrom());
+        } else if (message.getType() == EMMessage.Type.VOICE) {
+            VoiceMessageBody voiceBody = (VoiceMessageBody) message.getBody();
+            final String filePath = voiceBody.getLocalUrl();
+            viewHolder.mMessage.setText("语音！！！");
+            viewHolder.mMessage.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
+                    if (!(new File(filePath).exists())) {
+                        return;
+                    }
+                    ((ChatActivity) mActivity).playMsgId = message.getMsgId();
+                    AudioManager audioManager = (AudioManager) mActivity.getSystemService(Context.AUDIO_SERVICE);
+
+                    mediaPlayer = new MediaPlayer();
+                    if (EMChatManager.getInstance().getChatOptions().getUseSpeaker()) {
+                        audioManager.setMode(AudioManager.MODE_NORMAL);
+                        audioManager.setSpeakerphoneOn(true);
+                        mediaPlayer.setAudioStreamType(AudioManager.STREAM_RING);
+                    } else {
+                        audioManager.setSpeakerphoneOn(false);// 关闭扬声器
+                        // 把声音设定成Earpiece（听筒）出来，设定为正在通话中
+                        audioManager.setMode(AudioManager.MODE_IN_CALL);
+                        mediaPlayer.setAudioStreamType(AudioManager.STREAM_VOICE_CALL);
+                    }
+                    try {
+                        mediaPlayer.setDataSource(filePath);
+                        mediaPlayer.prepare();
+                        mediaPlayer.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
+
+                            @Override
+                            public void onCompletion(MediaPlayer mp) {
+                                // TODO Auto-generated method stub
+                                mediaPlayer.release();
+                                mediaPlayer = null;
+                            }
+
+                        });
+                        mediaPlayer.start();
+
+                    } catch (Exception e) {
+                    }
+                }
+            });
+
+        }
+
 
         return view;
     }

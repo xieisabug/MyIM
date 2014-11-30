@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.media.MediaRecorder;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
@@ -15,21 +16,29 @@ import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.LinearLayout;
 import android.widget.ListView;
+import android.widget.Toast;
 
+import com.easemob.EMError;
 import com.easemob.chat.EMChatManager;
 import com.easemob.chat.EMGroup;
 import com.easemob.chat.EMGroupManager;
 import com.easemob.chat.EMMessage;
 import com.easemob.chat.TextMessageBody;
+import com.easemob.chat.VoiceMessageBody;
 import com.easemob.exceptions.EaseMobException;
+import com.easemob.util.VoiceRecorder;
 import com.im.oxygen.myim.adapter.MessageAdapter;
+
+import java.io.File;
+import java.io.IOException;
 
 import butterknife.ButterKnife;
 import butterknife.InjectView;
 
 
-public class ChatActivity extends ActionBarActivity implements View.OnClickListener{
+public class ChatActivity extends ActionBarActivity implements View.OnClickListener {
 
     private static final int MESSAGE_REFRESH = 1;
     public static final int CHAT = 1;
@@ -40,6 +49,16 @@ public class ChatActivity extends ActionBarActivity implements View.OnClickListe
     Button mSend;
     @InjectView(R.id.chat_list)
     ListView mChatList;
+    @InjectView(R.id.expand)
+    Button mExpand;
+    @InjectView(R.id.voice)
+    Button mVoice;
+    @InjectView(R.id.button_container)
+    LinearLayout mButtonContainer;
+
+    boolean recordFlag;
+    VoiceRecorder voiceRecorder;
+    MediaRecorder recorder;
 
     MessageAdapter mMessageAdapter;
     NewMessageBroadcastReceiver msgReceiver;
@@ -47,6 +66,8 @@ public class ChatActivity extends ActionBarActivity implements View.OnClickListe
     String username;
     EMGroup group;
     int chatType;
+
+    String voiceFileName;
 
     Handler mMessageHandler = new Handler() {
         @Override
@@ -59,6 +80,7 @@ public class ChatActivity extends ActionBarActivity implements View.OnClickListe
             }
         }
     };
+    public String playMsgId;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -86,8 +108,13 @@ public class ChatActivity extends ActionBarActivity implements View.OnClickListe
 
         mChatList.setAdapter(mMessageAdapter);
         mChatList.setSelection(mChatList.getCount() - 1);
-        mSend.setOnClickListener(this);
 
+        mSend.setOnClickListener(this);
+        mExpand.setOnClickListener(this);
+        mVoice.setOnClickListener(this);
+
+        recordFlag = false;
+        voiceRecorder = new VoiceRecorder(new Handler(){});
     }
 
 
@@ -136,6 +163,62 @@ public class ChatActivity extends ActionBarActivity implements View.OnClickListe
                     }
                 }
                 break;
+            case R.id.expand:
+                if (mButtonContainer.getVisibility() == View.VISIBLE) {
+                    mButtonContainer.setVisibility(View.GONE);
+                } else if (mButtonContainer.getVisibility() == View.GONE) {
+                    mButtonContainer.setVisibility(View.VISIBLE);
+                }
+                break;
+            case R.id.voice:
+                if (!recordFlag) {
+                    /*recorder = new MediaRecorder();
+                    recorder.setAudioSource(MediaRecorder.AudioSource.MIC);
+                    recorder.setOutputFormat(MediaRecorder.OutputFormat.THREE_GPP);
+                    recorder.setAudioEncoder(MediaRecorder.AudioEncoder.AMR_NB);
+                    String path = this.getFilesDir().getPath() + "voice/";
+                    voiceFileName = path + "voice_" + System.currentTimeMillis();
+                    File file = new File(path);
+                    if (!file.exists()) {
+                        file.mkdir();
+                    }
+                    Log.d("path", path);
+                    recorder.setOutputFile(voiceFileName);
+                    try {
+                        recorder.prepare();
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                    recorder.start();   // Recording is now started
+                    recordFlag = !recordFlag;*/
+                    try {
+                        voiceRecorder.startRecording(null, username, getApplicationContext());
+                        recordFlag = !recordFlag;
+                    } catch (Exception e) {
+                        Toast.makeText(ChatActivity.this, "发送失败，请检测服务器是否连接", Toast.LENGTH_SHORT).show();
+                        e.printStackTrace();
+                    }
+                } else {
+                    /*recorder.stop();
+                    recorder.release(); // Now the object cannot be reused
+                    recorder = null;
+                    sendVoice(voiceFileName,"3");*/
+                    try {
+                        int length = voiceRecorder.stopRecoding();
+                        if (length > 0) {
+                            sendVoice(voiceRecorder.getVoiceFilePath(), voiceRecorder.getVoiceFileName(username),
+                                    Integer.toString(length), false);
+                        } else if (length == EMError.INVALID_FILE) {
+                            Toast.makeText(getApplicationContext(), "无录音权限", Toast.LENGTH_SHORT).show();
+                        } else {
+                            Toast.makeText(getApplicationContext(), "录音时间太短", Toast.LENGTH_SHORT).show();
+                        }
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                        Toast.makeText(ChatActivity.this, "发送失败，请检测服务器是否连接", Toast.LENGTH_SHORT).show();
+                    }
+                }
+                break;
         }
     }
 
@@ -143,6 +226,37 @@ public class ChatActivity extends ActionBarActivity implements View.OnClickListe
     protected void onDestroy() {
         super.onDestroy();
         unregisterReceiver(msgReceiver);
+    }
+
+    /**
+     * 发送语音
+     *
+     * @param filePath
+     * @param length
+     */
+    private void sendVoice(String filePath,String fileName, String length, boolean some) {
+        if (!(new File(filePath).exists())) {
+            return;
+        }
+        try {
+            final EMMessage message = EMMessage.createSendMessage(EMMessage.Type.VOICE);
+            // 如果是群聊，设置chattype,默认是单聊
+            if (chatType == GROUP_CHAT)
+                message.setChatType(EMMessage.ChatType.GroupChat);
+            message.setReceipt(username);
+            int len = Integer.parseInt(length);
+            VoiceMessageBody body = new VoiceMessageBody(new File(filePath), len);
+            message.addBody(body);
+            EMChatManager.getInstance().sendMessage(message);
+
+            mMessageHandler.sendEmptyMessage(MESSAGE_REFRESH);
+            mChatList.setSelection(mChatList.getCount() - 1);
+            setResult(RESULT_OK);
+            // send file
+            // sendVoiceSub(filePath, fileName, message);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     private class NewMessageBroadcastReceiver extends BroadcastReceiver {
