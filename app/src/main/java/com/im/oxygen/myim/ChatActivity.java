@@ -18,6 +18,8 @@ import android.widget.EditText;
 import android.widget.ListView;
 
 import com.easemob.chat.EMChatManager;
+import com.easemob.chat.EMGroup;
+import com.easemob.chat.EMGroupManager;
 import com.easemob.chat.EMMessage;
 import com.easemob.chat.TextMessageBody;
 import com.easemob.exceptions.EaseMobException;
@@ -30,6 +32,8 @@ import butterknife.InjectView;
 public class ChatActivity extends ActionBarActivity implements View.OnClickListener{
 
     private static final int MESSAGE_REFRESH = 1;
+    public static final int CHAT = 1;
+    public static final int GROUP_CHAT = 2;
     @InjectView(R.id.text)
     EditText mText;
     @InjectView(R.id.send)
@@ -41,6 +45,8 @@ public class ChatActivity extends ActionBarActivity implements View.OnClickListe
     NewMessageBroadcastReceiver msgReceiver;
 
     String username;
+    EMGroup group;
+    int chatType;
 
     Handler mMessageHandler = new Handler() {
         @Override
@@ -64,12 +70,22 @@ public class ChatActivity extends ActionBarActivity implements View.OnClickListe
         IntentFilter intentFilter = new IntentFilter(EMChatManager.getInstance().getNewMessageBroadcastAction());
         intentFilter.setPriority(3);
         registerReceiver(msgReceiver, intentFilter);
-        username = getIntent().getStringExtra("username");
-        getSupportActionBar().setTitle(username);
+
+        chatType = getIntent().getIntExtra("chatType", CHAT);
+        if (chatType == CHAT) {
+            username = getIntent().getStringExtra("username");
+            getSupportActionBar().setTitle(username);
+        } else if (chatType == GROUP_CHAT) {
+            username = getIntent().getStringExtra("groupId");
+            group = EMGroupManager.getInstance().getGroup(username);
+            getSupportActionBar().setTitle(group.getGroupName());
+        }
+        getSupportActionBar().setDisplayHomeAsUpEnabled(true);
 
         mMessageAdapter = new MessageAdapter(this, username);
 
         mChatList.setAdapter(mMessageAdapter);
+        mChatList.setSelection(mChatList.getCount() - 1);
         mSend.setOnClickListener(this);
 
     }
@@ -90,7 +106,8 @@ public class ChatActivity extends ActionBarActivity implements View.OnClickListe
         int id = item.getItemId();
 
         //noinspection SimplifiableIfStatement
-        if (id == R.id.action_settings) {
+        if (id == android.R.id.home) {
+            this.finish();
             return true;
         }
 
@@ -107,6 +124,9 @@ public class ChatActivity extends ActionBarActivity implements View.OnClickListe
                     message.setReceipt(username);
                     TextMessageBody textMessageBody = new TextMessageBody(text);
                     message.addBody(textMessageBody);
+                    if (chatType == GROUP_CHAT) {
+                        message.setChatType(EMMessage.ChatType.GroupChat);
+                    }
                     try {
                         EMChatManager.getInstance().sendMessage(message);
                         mText.setText("");
@@ -128,6 +148,8 @@ public class ChatActivity extends ActionBarActivity implements View.OnClickListe
     private class NewMessageBroadcastReceiver extends BroadcastReceiver {
         @Override
         public void onReceive(Context context, Intent intent) {
+            // 记得把广播给终结掉
+            abortBroadcast();
             //消息id
             String msgId = intent.getStringExtra("msgid");
             //发消息的人的username(userid)
@@ -135,9 +157,18 @@ public class ChatActivity extends ActionBarActivity implements View.OnClickListe
             //消息类型，文本，图片，语音消息等,这里返回的值为msg.type.ordinal()。
             //所以消息type实际为是enum类型
             int msgType = intent.getIntExtra("type", 0);
-            Log.d("ChatActivity", "new message id:" + msgId + " from:" + msgFrom + " type:" + msgType);
             //更方便的方法是通过msgId直接获取整个message
             EMMessage message = EMChatManager.getInstance().getMessage(msgId);
+            // 如果是群聊消息，获取到group id
+            if (message.getChatType() == EMMessage.ChatType.GroupChat) {
+                username = message.getTo();
+            }
+            if (!username.equals(username)) {
+                // 消息不是发给当前会话，return
+                return;
+            }
+            Log.d("ChatActivity", "new message id:" + msgId + " from:" + msgFrom + " type:" + msgType);
+
             Log.d("ChatActivity", "message content:" + ((TextMessageBody) message.getBody()).getMessage());
             mMessageHandler.sendEmptyMessage(MESSAGE_REFRESH);
         }

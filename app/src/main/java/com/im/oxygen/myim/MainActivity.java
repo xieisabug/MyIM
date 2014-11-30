@@ -156,9 +156,18 @@ public class MainActivity extends ActionBarActivity implements AdapterView.OnIte
 
     @Override
     public void onItemClick(AdapterView<?> adapterView, View view, int i, long l) {
-        Intent intent = new Intent(MainActivity.this, ChatActivity.class);
-        intent.putExtra("username", this.usernames.get(i));
-        startActivity(intent);
+        if (mPeople.isChecked()) {
+            Intent intent = new Intent(MainActivity.this, ChatActivity.class);
+            intent.putExtra("username", this.usernames.get(i));
+            intent.putExtra("chatType", ChatActivity.CHAT);
+            startActivity(intent);
+        } else if (mGroup.isChecked()) {
+            Intent intent = new Intent(MainActivity.this, ChatActivity.class);
+            intent.putExtra("groupId", this.emGroups.get(i).getGroupId());
+            intent.putExtra("chatType", ChatActivity.GROUP_CHAT);
+            startActivity(intent);
+        }
+
     }
 
     @Override
