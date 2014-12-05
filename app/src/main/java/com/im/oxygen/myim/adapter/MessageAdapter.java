@@ -1,9 +1,13 @@
 package com.im.oxygen.myim.adapter;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.Context;
+import android.content.DialogInterface;
+import android.content.SharedPreferences;
 import android.media.AudioManager;
 import android.media.MediaPlayer;
+import android.preference.PreferenceManager;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -11,11 +15,13 @@ import android.view.ViewGroup;
 import android.widget.BaseAdapter;
 import android.widget.TextView;
 
+import com.easemob.chat.CmdMessageBody;
 import com.easemob.chat.EMChatManager;
 import com.easemob.chat.EMConversation;
 import com.easemob.chat.EMMessage;
 import com.easemob.chat.TextMessageBody;
 import com.easemob.chat.VoiceMessageBody;
+import com.easemob.exceptions.EaseMobException;
 import com.im.oxygen.myim.ChatActivity;
 import com.im.oxygen.myim.R;
 
@@ -45,7 +51,7 @@ public class MessageAdapter extends BaseAdapter {
 
     }
 
-    public void refresh(){
+    public void refresh() {
         this.emConversation = EMChatManager.getInstance().getConversation(mUsername);
         this.notifyDataSetChanged();
     }
@@ -72,7 +78,7 @@ public class MessageAdapter extends BaseAdapter {
 
     @Override
     public int getItemViewType(int position) {
-        Log.d("message adapter","get item view type position:" + position);
+        Log.d("message adapter", "get item view type position:" + position);
         EMMessage message = emConversation.getMessage(position);
         if (EMMessage.Direct.RECEIVE == message.direct) {
             return 0;
@@ -98,7 +104,7 @@ public class MessageAdapter extends BaseAdapter {
         }
         if (message.getType() == EMMessage.Type.TXT) {
             String messageText = ((TextMessageBody) message.getBody()).getMessage();
-            Log.d("message adapter",messageText + " from " + message.getFrom() +
+            Log.d("message adapter", messageText + " from " + message.getFrom() +
                     " : " + message.direct.name());
 
             viewHolder.mMessage.setText(messageText);
@@ -143,9 +149,12 @@ public class MessageAdapter extends BaseAdapter {
                         mediaPlayer.start();
 
                     } catch (Exception e) {
+                        e.printStackTrace();
                     }
                 }
             });
+
+        } else if (message.getType() == EMMessage.Type.CMD) {
 
         }
 
@@ -158,6 +167,7 @@ public class MessageAdapter extends BaseAdapter {
         TextView mMessage;
         @InjectView(R.id.username)
         TextView mUsername;
+
         ViewHolder(View view) {
             ButterKnife.inject(this, view);
         }

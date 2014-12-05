@@ -1,13 +1,16 @@
 package com.im.oxygen.myim;
 
+import android.app.AlertDialog;
 import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.media.MediaRecorder;
+import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
+import android.preference.PreferenceManager;
 import android.support.v7.app.ActionBarActivity;
 import android.text.TextUtils;
 import android.util.Log;
@@ -21,6 +24,7 @@ import android.widget.ListView;
 import android.widget.Toast;
 
 import com.easemob.EMError;
+import com.easemob.chat.CmdMessageBody;
 import com.easemob.chat.EMChatManager;
 import com.easemob.chat.EMGroup;
 import com.easemob.chat.EMGroupManager;
@@ -32,7 +36,7 @@ import com.easemob.util.VoiceRecorder;
 import com.im.oxygen.myim.adapter.MessageAdapter;
 
 import java.io.File;
-import java.io.IOException;
+import java.util.HashMap;
 
 import butterknife.ButterKnife;
 import butterknife.InjectView;
@@ -53,21 +57,21 @@ public class ChatActivity extends ActionBarActivity implements View.OnClickListe
     Button mExpand;
     @InjectView(R.id.voice)
     Button mVoice;
+    @InjectView(R.id.get_name_card)
+    Button mSendNameCard;
     @InjectView(R.id.button_container)
     LinearLayout mButtonContainer;
 
     boolean recordFlag;
     VoiceRecorder voiceRecorder;
-    MediaRecorder recorder;
 
     MessageAdapter mMessageAdapter;
     NewMessageBroadcastReceiver msgReceiver;
+    CmdMessageBroadcastReceiver cmdMessageBroadcastReceiver;
 
     String username;
     EMGroup group;
     int chatType;
-
-    String voiceFileName;
 
     Handler mMessageHandler = new Handler() {
         @Override
@@ -93,6 +97,11 @@ public class ChatActivity extends ActionBarActivity implements View.OnClickListe
         intentFilter.setPriority(3);
         registerReceiver(msgReceiver, intentFilter);
 
+        cmdMessageBroadcastReceiver = new CmdMessageBroadcastReceiver();
+        IntentFilter cmdFilter = new IntentFilter(EMChatManager.getInstance().getCmdMessageBroadcastAction());
+        intentFilter.setPriority(3);
+        registerReceiver(cmdMessageBroadcastReceiver, cmdFilter);
+
         chatType = getIntent().getIntExtra("chatType", CHAT);
         if (chatType == CHAT) {
             username = getIntent().getStringExtra("username");
@@ -101,6 +110,8 @@ public class ChatActivity extends ActionBarActivity implements View.OnClickListe
             username = getIntent().getStringExtra("groupId");
             group = EMGroupManager.getInstance().getGroup(username);
             getSupportActionBar().setTitle(group.getGroupName());
+            //群聊不能要求发送名片
+            mSendNameCard.setVisibility(View.GONE);
         }
         getSupportActionBar().setDisplayHomeAsUpEnabled(true);
 
@@ -112,6 +123,7 @@ public class ChatActivity extends ActionBarActivity implements View.OnClickListe
         mSend.setOnClickListener(this);
         mExpand.setOnClickListener(this);
         mVoice.setOnClickListener(this);
+        mSendNameCard.setOnClickListener(this);
 
         recordFlag = false;
         voiceRecorder = new VoiceRecorder(new Handler(){});
@@ -172,25 +184,6 @@ public class ChatActivity extends ActionBarActivity implements View.OnClickListe
                 break;
             case R.id.voice:
                 if (!recordFlag) {
-                    /*recorder = new MediaRecorder();
-                    recorder.setAudioSource(MediaRecorder.AudioSource.MIC);
-                    recorder.setOutputFormat(MediaRecorder.OutputFormat.THREE_GPP);
-                    recorder.setAudioEncoder(MediaRecorder.AudioEncoder.AMR_NB);
-                    String path = this.getFilesDir().getPath() + "voice/";
-                    voiceFileName = path + "voice_" + System.currentTimeMillis();
-                    File file = new File(path);
-                    if (!file.exists()) {
-                        file.mkdir();
-                    }
-                    Log.d("path", path);
-                    recorder.setOutputFile(voiceFileName);
-                    try {
-                        recorder.prepare();
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                    recorder.start();   // Recording is now started
-                    recordFlag = !recordFlag;*/
                     try {
                         voiceRecorder.startRecording(null, username, getApplicationContext());
                         recordFlag = !recordFlag;
@@ -199,10 +192,6 @@ public class ChatActivity extends ActionBarActivity implements View.OnClickListe
                         e.printStackTrace();
                     }
                 } else {
-                    /*recorder.stop();
-                    recorder.release(); // Now the object cannot be reused
-                    recorder = null;
-                    sendVoice(voiceFileName,"3");*/
                     try {
                         int length = voiceRecorder.stopRecoding();
                         if (length > 0) {
@@ -219,6 +208,9 @@ public class ChatActivity extends ActionBarActivity implements View.OnClickListe
                     }
                 }
                 break;
+            case R.id.get_name_card:
+                getNameCard();
+                break;
         }
     }
 
@@ -230,9 +222,6 @@ public class ChatActivity extends ActionBarActivity implements View.OnClickListe
 
     /**
      * 发送语音
-     *
-     * @param filePath
-     * @param length
      */
     private void sendVoice(String filePath,String fileName, String length, boolean some) {
         if (!(new File(filePath).exists())) {
@@ -257,6 +246,21 @@ public class ChatActivity extends ActionBarActivity implements View.OnClickListe
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    private void getNameCard(){
+        EMMessage message = EMMessage.createSendMessage(EMMessage.Type.CMD);
+        message.setReceipt(username);
+        CmdMessageBody cmdMessageBody = new CmdMessageBody("name_card");
+        message.addBody(cmdMessageBody);
+        try {
+            EMChatManager.getInstance().sendMessage(message);
+            mMessageHandler.sendEmptyMessage(MESSAGE_REFRESH);
+            mChatList.setSelection(mChatList.getCount() - 1);
+        } catch (EaseMobException e) {
+            e.printStackTrace();
+        }
+
     }
 
     private class NewMessageBroadcastReceiver extends BroadcastReceiver {
@@ -284,6 +288,65 @@ public class ChatActivity extends ActionBarActivity implements View.OnClickListe
             Log.d("ChatActivity", "new message id:" + msgId + " from:" + msgFrom + " type:" + msgType);
 
             Log.d("ChatActivity", "message content:" + ((TextMessageBody) message.getBody()).getMessage());
+            mMessageHandler.sendEmptyMessage(MESSAGE_REFRESH);
+        }
+    }
+
+    private class CmdMessageBroadcastReceiver extends BroadcastReceiver {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            // 记得把广播给终结掉
+            abortBroadcast();
+            //消息id
+            String msgId = intent.getStringExtra("msgid");
+            //发消息的人的username(userid)
+            String msgFrom = intent.getStringExtra("from");
+            //消息类型，文本，图片，语音消息等,这里返回的值为msg.type.ordinal()。
+            //所以消息type实际为是enum类型
+            int msgType = intent.getIntExtra("type", 0);
+            //更方便的方法是通过msgId直接获取整个message
+            EMMessage message = intent.getParcelableExtra("message");
+            if (!username.equals(username)) {
+                // 消息不是发给当前会话，return
+                return;
+            }
+
+            CmdMessageBody cmdMessageBody = (CmdMessageBody) message.getBody();
+            if (cmdMessageBody.action.equals("name_card")) {
+                AlertDialog.Builder builder = new AlertDialog.Builder(ChatActivity.this);
+                builder
+                        .setTitle("对方希望您介绍自己")
+                        .setMessage("对方希望您介绍自己，发送卡片给对方")
+                        .setPositiveButton("发送", new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialogInterface, int i) {
+                                SharedPreferences sharedPreferences =
+                                        PreferenceManager.getDefaultSharedPreferences(ChatActivity.this);
+                                String myName = sharedPreferences.getString("username","");
+                                EMMessage sendMessage = EMMessage.createSendMessage(EMMessage.Type.TXT);
+                                sendMessage.setReceipt(username);
+                                TextMessageBody textMessageBody = new TextMessageBody("您好，我是 " + myName);
+                                sendMessage.addBody(textMessageBody);
+
+                                try {
+                                    EMChatManager.getInstance().sendMessage(sendMessage);
+                                } catch (EaseMobException e) {
+                                    e.printStackTrace();
+                                }
+                                dialogInterface.dismiss();
+                            }
+                        })
+                        .setNegativeButton("拒绝", new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialogInterface, int i) {
+                                dialogInterface.dismiss();
+                            }
+                        })
+                        .show();
+            }
+            Log.d("ChatActivity", "new message id:" + msgId + " from:" + msgFrom + " type:" + msgType);
+
+//            Log.d("ChatActivity", "message content:" + ((TextMessageBody) message.getBody()).getMessage());
             mMessageHandler.sendEmptyMessage(MESSAGE_REFRESH);
         }
     }
